@@ -1,0 +1,44 @@
+---
+title: "SSW output"
+author: "Krista Chan"
+date: "June 14, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(tidycensus)
+census_api_key('cba0886fe60dfd507ca24cd3be4831bb1b3113ba', install=TRUE, overwrite=TRUE)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(readxl)
+library(stringr)
+
+create_census_df <- function(census_table, dataset = "acs5", year = 2017, st = "IL", cnty = "Cook", geo = "tract") {
+  
+  variables <- load_variables(year, dataset, cache = TRUE)
+  table_name <- get_acs(geography = geo, 
+                 table = census_table, 
+                 state = st, county = cnty)
+  table_name <- gather(table_name, key = "value_attribute", value = "estimate", estimate)
+  table_name <- table_name[c("GEOID", "NAME", "variable", "estimate")]
+  table_name <- spread(table_name, key = variable, value = estimate)
+  col_names <- tail(names(table_name), length(table_name) - 2)
+  
+  for (i in tail(names(table_name), length(table_name) - 2)){
+    colnames(table_name)[colnames(table_name) == i] <- variables[variables$name == i, ]$label
+  }
+  return(table_name)
+}
+equivalency <- read_excel("~/South Side Weekly/2010 Tract to Community Area Equivalency File.xlsx")
+income_2017 <- create_census_df("B25119")
+foreign_born_2017 <- create_census_df("B05007")
+foreign_born_2017$TRACT <- as.numeric(str_sub(foreign_born_2017$GEOID, -6, -1))
+foreign_born_2017 <- merge(foreign_born_2017, equivalency, by="TRACT")
+chinatown_fb_2017 <- subset(foreign_born_2017, CHGOCA == 34)
+chinatown_fb_2017 <- chinatown_fb_2017 %>% dplyr:: select(starts_with("Estimate!!Total!!Asia"), "TRACT")
+```
+
